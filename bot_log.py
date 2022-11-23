@@ -12,7 +12,7 @@ def log(text, event = 'Отладочное сообщение'):
             logMEssage = f'[{currentDate}] [{event}]\n{text}'
             logFile.write('\n' + logMEssage)
 
-        elif event == 'СООБЩЕНИЕ':
+        elif 'СООБЩЕНИЕ' in event:
             logMEssage = f'[{currentDate}] [{event}]\n{text}'
             logFile.write('\n' + logMEssage)
             
