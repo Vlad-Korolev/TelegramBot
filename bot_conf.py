@@ -6,7 +6,7 @@ def create_config(path):
     """
     config = configparser.ConfigParser()
     config.add_section("TELEGRAM")
-    config.set("TELEGRAM", "telegramaccesstoken", "5964465799:AAG-9zZOYOsNCfT_bGv-xV1xHTcyKJdO2k8")
+    config.set("TELEGRAM", "telegramaccesstoken", "YOUR_TOKEN")
     config.set("TELEGRAM", "telegramurl", "https://api.telegram.org/bot")
 
     config.add_section("LOG")
