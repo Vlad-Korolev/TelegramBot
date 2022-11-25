@@ -1,25 +1,25 @@
 # Запросы к web-приложению.
 import requests
-# Дата и время
+# Дата и время.
 import datetime
-# Использования файла конфигурации.
-from configparser import ConfigParser 
-# Использования регулярных выражений.
-import re
-# Используем функцию log из модуля bot_log (находится в корневой папке). Для логирвоаняи событий
+# Для логирвания событий.
 from bot_log import log
+# Для считывания и перезаписи переменых в файл конфигурации.
+from bot_conf import get_setting, update_setting
+# Для работы с файлами
+import os
 
 
-# Переменная для работы 'ConfigParser'.
-config = ConfigParser() 
-# Прочесть файла конфигурации.
-config.read('config.ini')
-# Переменная для хранения ссылки запросов (прочитана с файла).
-urlSchedule = config.get('AVALON', 'urlSchedule')
-# Переменная для хранения даты выгрузки и парсинга расписания с сайта
-lastSchedule = config.get('AVALON', 'lastSchedule')
-# Переменная для хранения расписания на день
-scheduleDay = config.get('AVALON', 'scheduleDay')
+# Путь к файлу конфигурации.
+configFile = "config.ini"
+# Переменная для хранения ссылки запросов.
+urlSchedule = get_setting(configFile, "AVALON", "urlSchedule")
+# Переменная для хранения даты последней выгрузки с сайта.
+lastSchedule = get_setting(configFile, "AVALON", "lastSchedule")
+# Переменная для хранения расписания на день.
+scheduleDay = get_setting(configFile, "AVALON", "scheduleDay")
+
+
 
 def check_match(date):
     '''
@@ -30,9 +30,10 @@ def check_match(date):
     global lastSchedule
     global scheduleDay
     first_date = date
+
     
     # Открываем файл с GET-ответом
-    with open('avalon.html', 'r', encoding="utf-8") as file:
+    with open('Hash/avalon.html', 'r', encoding="utf-8") as file:
 
         while True:
             # считываем строку
@@ -75,14 +76,10 @@ def check_match(date):
                             # Переменная для хранения сформированного текста с расписанием.
                             schedule = f'[{first_date}]\nЗанятий нету,\nближайшее занятие:\n\n[{date}]\n{lblTime}\n{lblClassType}\n{lblClassroom}\n{lblCourse}\n{lblTeacher}'
 
-                        # Записываем текущее расписание в config.ini.
-                        config.set('AVALON', 'scheduleDay',  schedule)
-                        config.write(open('config.ini', "w"))
-                        # Записываем дату выгрузки и парсинга расписания с сайта в config.ini.
-                        config.set('AVALON', 'lastSchedule',  first_date)
-                        config.write(open('config.ini', "w"))
+                        log(f'Расписание на {date} сформировано, сохранено в config.ini', 'bot_pars')
+                        update_setting(configFile, "AVALON", "lastschedule", first_date)
+                        update_setting(configFile, "AVALON", "scheduleDay", schedule)
                         
-                        log(f'Расписание {date} сформировано', 'bot_pars')
                         # Возвращаем расписание.
                         return(schedule)           
 
@@ -92,7 +89,7 @@ def check_match(date):
                 # (ищем ближайщий день с занятиями)
                 res = datetime.datetime.strptime(date, "%d.%m.%Y")
                 date = (res + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
-                log(f'{date} занятий нет, ищем ближайщий день', 'bot_pars')
+                log(f'Ищем ближайщий день {date}', 'bot_pars')
                 # Возвращаем указатель на начало файла.
                 file.seek(0)
   
@@ -102,37 +99,44 @@ def schedule(current_date):
     
     '''
     # Указываем глобальные переменные.
-    global urlSchedule
-    global lastSchedule
-    global scheduleDay
+    global urlSchedule, lastSchedule, scheduleDay
 
-    log(f'Запрос на расписание {current_date}', 'bot_pars')
+    log(f'Запрос расписание на {current_date}', 'bot_pars')
     
     # Условие выполняется только в том случае, если дата полученная current_date == дате последней выгрузке расписания.
     if current_date == lastSchedule:
         schedule = scheduleDay
-        log(f'Расписание {current_date} найдено в хэше', 'bot_pars')
+        log(f'Расписание на {current_date} найдено в хэше', 'bot_pars')
         return(schedule)
+    else:
+        log(f'Расписание на {current_date} в хэше не найдено', 'bot_pars')
 
     # Обрабатываем отправку GET-запроса по адресу университета. 
     try:
         # GET-запрос
         r = requests.get(urlSchedule)
+        log(f'GET-запрос к AVALON, получение расписания на {current_date} выполнен успешно', 'bot_pars')
+        # Условие: данная дериктория есть в наличии
+        if not os.path.exists("Hash"):
+            os.mkdir('Hash')
         # Создание файла.
-        with open('avalon.html', 'w', encoding="utf-8") as file:
+        with open('Hash/avalon.html', 'w', encoding="utf-8") as file:
             # Запись ответана GET-запрос в файл.
             file.write(r.text)
-            log('GET-запрос на получение расписания {current_date} выполнен успешно', 'bot_pars')
+            log(f'Результат GET-запроса сохранен в файл.', 'bot_pars')
+            
     except:
         schedule = 'Расписание недоступно.'
-        log('GET-запрос на получение расписания {current_date} не выполнен', 'bot_pars')
+        log(f'GET-запрос на получение расписания {current_date} не выполнен', 'bot_pars')
         return(schedule)
 
     schedule = check_match(current_date)
     return(schedule)
+    
      
 
 # Условие: файл запускается самостоятельно (не импортирован в виде модуля).
 if __name__ == '__main__': 
     now = (datetime.datetime.now()).strftime("%d.%m.%Y")
-    print(schedule('22.11.2022'))
+    print(schedule('24.11.2022'))
+    #print(schedule(now))

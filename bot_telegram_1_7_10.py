@@ -4,26 +4,26 @@ import requests
 import json
 # Дата и время
 import datetime
-# Использования файла конфигурации.
-from configparser import ConfigParser 
 # Используем функцию log из модуля bot_log (находится в корневой папке). Для логирвоаняи событий
 from bot_log import log
 # Используем функцию schedule из модуля bot_pars (находится в корневой папке). Для полученяи расписания
 from bot_pars import schedule
+# Для считывания и перезаписи переменых в файл конфигурации.
+from bot_conf import get_setting, get_config
 
-
-# Переменная для работы 'ConfigParser'.
-config = ConfigParser() 
-# Прочесть файла конфигурации.
-config.read('config.ini')
-
+# Путь к файлу с настрйоками.
+path = "config.ini"
 # Переменная для хранения Токена телеграмм (прочитан с файла).
-telegramAccessToken = config.get('TELEGRAM', 'telegramAccessToken')
+telegramAccessToken = get_setting(path, "TELEGRAM", "telegramaccesstoken")
 # Переменная для хранения ссылки запросов (прочитана с файла).
-telegramUrl = config.get('TELEGRAM', 'telegramUrl')
+telegramUrl = get_setting(path, "TELEGRAM", "telegramurl")
 # Переменная для хранения 'id_update'(необходим для отправки на сервер при long-Pooling),
 # на основании 'id_update' сервер понимает, какой последний update мы получили.
 offset = -1
+
+
+
+# ====================== Классы ======================
 
 # ====================== Функции ======================
 def check_message(response):
@@ -33,7 +33,7 @@ def check_message(response):
             "response" - ответ от GET-запроса.
         Функция ничего не возвращает.
     '''
-    # Указываем, что 'offset' является глобальной переменной 
+    # Указываем, что 'offset' является глобальной переменной.
     global offset
 
     # Условие выполняется только в том случае, если внутри ответа на GET-запрос [0][message] есть ключ: [text].
@@ -145,7 +145,7 @@ def check_callback(response):
         log('[0][callback_query][data] совпадение по тексту: schedule')
 
         # Ф-ция для записи сообщений в log-файл.
-        log('Совпадение по тексту: schedule: отправляем уведомление в чат')
+        log('Совпадение по тексту: schedule: (1/2) отправляем уведомление в чат')
         # Отправка уведомления в чат.
         # Метод запроса.
         req_url = "answerCallbackQuery"
@@ -157,7 +157,7 @@ def check_callback(response):
 
         # Меняем меню ReplyMarkup и текст сообщения.
         # Ф-ция для записи сообщений в log-файл
-        log('Совпадение по тексту: schedule: меняем меню ReplyMarkup и текст сообщения')
+        log('Совпадение по тексту: schedule: (2/2) меняем меню ReplyMarkup и текст сообщения')
         # Метод запроса.
         req_url = "editMessageText"
         # Параметры запроса.
@@ -175,7 +175,7 @@ def check_callback(response):
                                                                                          "url": "https://www.avalon.ru/Retraining/GroupSchedule/18667/"}],
                                                                     [{
                                                                                         "text":"Закрыть", 
-                                                                                         "callback_data" : "closeReply_markup"}]]})}
+                                                                              "callback_data" : "closeReply_markup"}]]})}
 
         # Ф-ция для отправки POST-запроса на сервер.
         request_post(req_url, req_param, update_id)
@@ -190,9 +190,10 @@ def check_callback(response):
         now = (datetime.datetime.now()).strftime("%d.%m.%Y")
         # Вызываем ф-цию для получения расписания (записываем ответ в переменную)
         scheduleCurrentDate = schedule(now)
+        
  
         # Отправка расписание занятий на сегодня.
-        log('Совпадение по тексту: currentDateSchedule: отправляем расписание на сегодня в чат')
+        log('Совпадение по тексту: currentDateSchedule: (1/2) отправляем расписание на сегодня в чат')
         # Метод запроса.
         req_url = "sendMessage"
         # Параметры запроса.
@@ -203,7 +204,7 @@ def check_callback(response):
 
         # Удаление сообщения с ReplyMarkup
         # Ф-ция для записи сообщений в log-файл
-        log('Совпадение по тексту: currentDateSchedule: удаляем предыдущее сообщение')
+        log('Совпадение по тексту: currentDateSchedule: (2/2) удаляем предыдущее сообщение')
         # Запрос на удаление сообщения.
         # Метод запроса.
         req_url = "deleteMessage"
@@ -221,7 +222,7 @@ def check_callback(response):
 
         # Меняем меню ReplyMarkup и текст сообщения.
         # Ф-ция для записи сообщений в log-файл
-        log('Совпадение по тексту: weekDateSchedule: меняем меню ReplyMarkup и текст сообщения')
+        log('Совпадение по тексту: weekDateSchedule: (1/1) меняем меню ReplyMarkup и текст сообщения')
         # Метод запроса.
         req_url = "editMessageText"
         # Параметры запроса.
@@ -277,7 +278,7 @@ def request_post(req_url,  req_param, update_id):
         # Ф-ция для записи сообщений в log-файл
         log('Запрос POST-отправлен успешно')
         # Запрос POST в удобном для чтения формате .json
-        log((json.dumps(r, indent = 4)), 'POST')
+        log((json.dumps(r, indent = 4, ensure_ascii=False)), 'POST')
     # В случае неудачного запроса (при ошибке)
     except: 
         # Ф-ция для записи сообщений в log-файл
@@ -299,6 +300,8 @@ def request_get():
     '''
     # Указываем, что offset является глобальной переменной 
     global offset 
+    # Переменная для хранения счетчиков неудачных запросов подряд, при 3 останавливает выполнение, выбрасывает исключение.
+    req_fail_count = 0
 
     # Цикл на оправку GET-запроса.
     while True:    
@@ -310,7 +313,7 @@ def request_get():
             # Параметры запроса
             req_params = {
                         'timeout': 30,       # Сервер поддерживает соединения 30 секунд (Long-Pooling), при появлении ответа сразу его высылает.
-                        'offset': offset     # 'id_update'.
+                        'offset': offset     # id_update.
                         }
             # Get-запрос 
             r = requests.get(
@@ -322,11 +325,19 @@ def request_get():
             # Ф-ция для записи сообщений в log-файл
             log('GET-запрос выполнен успешно')
             # Ответ запроса в удобном для чтения формате json
-            log((json.dumps(r, indent = 4)), 'GET')
+            log((json.dumps(r, indent = 4, ensure_ascii=False)), 'GET')
+            # Сбрасываем счетчик неудачных запросов
+            req_fail_count = 0
         # В случае неудачного запроса (при ошибке).
         except: 
+            req_fail_count += 1
             # Ф-ция для записи сообщений в log-файл
-            log('GET-запрос не выполнен')
+            log(f'GET-запрос не выполнен, попытка № {req_fail_count}')
+            # Прерываем выполнение скрипта при првоале 3 GET-запросов подряд (во избижании зацикливания).
+            if req_fail_count == 2:
+                # Принудительно вызываем исключение.
+                raise
+            # Возвращаемся в начало цикла While.
             continue
 
         # Условие выполняется только в том случае, если в ответе на GET-запрос [result][0]: пустой.
@@ -345,7 +356,7 @@ def main():
     '''
         Основная функция для работы скрипта, производит запуск остальных функций.
     '''
-    # Указываем, что offset является глобальной переменной 
+    # Указываем, что offset является глобальной переменной.
     global offset
 
     while True:
@@ -358,6 +369,8 @@ def main():
             log('В GET-запросе [0] получен ключ [callback_query]')
             # Вызываем ф-цию для проверки [callback].
             check_callback(data)
+            # Возвращаемся в начало цикла While.
+            continue
                 
 
         # Условие выполняется только в том случае, если внутри ответа на GET-запрос [0] есть ключ: [message].
@@ -378,7 +391,7 @@ def main():
 if __name__ == '__main__':
     # Обработка исключений
     try:
-        print('Bot начал работу\nЛог записывается в "bot.log"')
+        print('Bot начал работу\nЛог записывается в "log/"')
         # Запускаем выполнения основной ф-ции.
         main()
     # исключение на 'ctrl+c'
