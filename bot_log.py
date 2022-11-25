@@ -15,10 +15,10 @@ def archive():
     global path, numberfileName
     
     try:
-        archive = zipfile.ZipFile(f'log/bot_{numberfileName}.zip', 'w', zipfile.ZIP_DEFLATED)
-        archive.write(f'log/bot_{numberfileName}.log')
+        archive = zipfile.ZipFile(f'Log/bot_{numberfileName}.zip', 'w', zipfile.ZIP_DEFLATED)
+        archive.write(f'Log/bot_{numberfileName}.log')
         archive.close()
-        os.remove(f'log/bot_{numberfileName}.log')
+        os.remove(f'Log/bot_{numberfileName}.log')
         
     except:
         print('[bot_log.py] ERROR Compressed')
@@ -37,12 +37,12 @@ def log(text, event = 'Отладочное сообщение'):
     now = datetime.datetime.now()
     currentDate = now.strftime("%d.%m.%Y %H:%M:%S")
 
-    if not os.path.exists("log"):
+    if not os.path.exists("Log"):
         os.mkdir('Log')
 
     try:
         
-        with open(f'log/bot_{numberfileName}.log', 'a+', encoding="utf-8") as logFile:
+        with open(f'Log/bot_{numberfileName}.log', 'a+', encoding="utf-8") as logFile:
             messageCount += 1
 
             if event == 'GET' or event == 'POST' or event == 'СООБЩЕНИЕ':
@@ -53,12 +53,12 @@ def log(text, event = 'Отладочное сообщение'):
                 logFile.write(logMEssage + "\n")  
 
     except FileNotFoundError:
-        print("[FAIL] Don't write log file")
+        print("[bot_log] FAIL. Don't write log file")
         
     if messageCount == maxMessage:
         messageCount = 0
         archive()
-        log(f'Log-файл: {f"log/bot_{numberfileName - 1}.log"} заполнен, заархивирован: {f"log/bot_{numberfileName - 1}.zip"}. Создан новый: {f"log/bot_{numberfileName}.log"}', 'Bot_log.py')
+        log(f'Log-файл: {f"Log/bot_{numberfileName - 1}.log"} заполнен, заархивирован: {f"Log/bot_{numberfileName - 1}.zip"}. Создан новый: {f"Log/bot_{numberfileName}.log"}', 'Bot_log.py')
 
     
     update_setting(path, "LOG", "messagecount", str(messageCount))
